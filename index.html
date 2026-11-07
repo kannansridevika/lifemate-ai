@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en" class="font-normal">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LifeMate AI – Your Guide • Your Companion • Your Daily Support</title>
+  <meta name="description" content="AI-Powered Accessibility Website Prototype designed for visually impaired people through voice-based AI assistance.">
+  <link rel="stylesheet" href="css/styles.css">
+
+  <!-- Self-Contained High-Performance React 18 Compatible Engine -->
+  <script>
+    (function() {
+      let currentComponent = null;
+      let hookIndex = 0;
+      let rootContainer = null;
+      let rootVirtualNode = null;
+      const componentHooks = new WeakMap();
+
+      function createElement(type, props, ...children) {
+        const flatChildren = children.flat(Infinity).filter(c => c !== null && c !== undefined && c !== false);
+        return {
+          type,
+          props: Object.assign({}, props || {}, {
+            children: flatChildren.length === 1 ? flatChildren[0] : (flatChildren.length > 0 ? flatChildren : undefined)
+          })
+        };
+      }
+
+      function useState(initialValue) {
+        const comp = currentComponent;
+        const idx = hookIndex++;
+        if (!componentHooks.has(comp)) componentHooks.set(comp, []);
+        const hooks = componentHooks.get(comp);
+
+        if (hooks[idx] === undefined) {
+          hooks[idx] = typeof initialValue === 'function' ? initialValue() : initialValue;
+        }
+
+        const setState = (newVal) => {
+          const next = typeof newVal === 'function' ? newVal(hooks[idx]) : newVal;
+          if (hooks[idx] !== next) {
+            hooks[idx] = next;
+            scheduleRender();
+          }
+        };
+
+        return [hooks[idx], setState];
+      }
+
+      function useEffect(callback, deps) {
+        const comp = currentComponent;
+        const idx = hookIndex++;
+        if (!componentHooks.has(comp)) componentHooks.set(comp, []);
+        const hooks = componentHooks.get(comp);
+
+        const prev = hooks[idx];
+        const hasChanged = !prev || !deps || deps.some((d, i) => !Object.is(d, prev.deps[i]));
+
+        if (hasChanged) {
+          if (prev && typeof prev.cleanup === 'function') {
+            try { prev.cleanup(); } catch (e) {}
+          }
+          setTimeout(() => {
+            try {
+              const cleanup = callback();
+              hooks[idx] = { deps, cleanup };
+            } catch (err) {
+              console.warn('Effect error:', err);
+            }
+          }, 0);
+        }
+      }
+
+      function useRef(initialValue) {
+        const comp = currentComponent;
+        const idx = hookIndex++;
+        if (!componentHooks.has(comp)) componentHooks.set(comp, []);
+        const hooks = componentHooks.get(comp);
+        if (hooks[idx] === undefined) {
+          hooks[idx] = { current: initialValue };
+        }
+        return hooks[idx];
+      }
+
+      function useMemo(factory, deps) {
+        const comp = currentComponent;
+        const idx = hookIndex++;
+        if (!componentHooks.has(comp)) componentHooks.set(comp, []);
+        const hooks = componentHooks.get(comp);
+        const prev = hooks[idx];
+        if (!prev || (deps && deps.some((d, i) => !Object.is(d, prev.deps[i])))) {
+          hooks[idx] = { value: factory(), deps };
+        }
+        return hooks[idx].value;
+      }
+
+      function useCallback(callback, deps) {
+        return useMemo(() => callback, deps);
+      }
+
+      function renderDOM(vnode) {
+        if (vnode === null || vnode === undefined || vnode === false) {
+          return document.createTextNode('');
+        }
+        if (typeof vnode === 'string' || typeof vnode === 'number') {
+          return document.createTextNode(String(vnode));
+        }
+
+        if (typeof vnode.type === 'function') {
+          const prevComp = currentComponent;
+          const prevIdx = hookIndex;
+          currentComponent = vnode.type;
+          hookIndex = 0;
+
+          let rendered;
+          try {
+            rendered = vnode.type(vnode.props || {});
+          } catch (err) {
+            console.error("Component render error in", vnode.type.name, err);
+            rendered = createElement('div', { className: 'p-4 text-red-500 font-bold' }, 'Render error: ' + err.message);
+          }
+
+          currentComponent = prevComp;
+          hookIndex = prevIdx;
+          return renderDOM(rendered);
+        }
+
+        // SVG elements require proper namespace
+        const svgTags = ['svg', 'path', 'circle', 'line', 'rect', 'polyline', 'polygon', 'g'];
+        const isSvg = svgTags.includes(vnode.type);
+        const el = isSvg
+          ? document.createElementNS('http://www.w3.org/2000/svg', vnode.type)
+          : document.createElement(vnode.type);
+
+        const props = vnode.props || {};
+
+        for (const [key, val] of Object.entries(props)) {
+          if (key === 'children' || val === undefined || val === null) continue;
+
+          if (key === 'ref' && val) {
+            if (typeof val === 'function') val(el);
+            else if (val.current !== undefined) val.current = el;
+          } else if (key.startsWith('on') && typeof val === 'function') {
+            const eventName = key.slice(2).toLowerCase();
+            el.addEventListener(eventName, val);
+          } else if (key === 'className') {
+            el.setAttribute('class', val);
+          } else if (key === 'style' && typeof val === 'object') {
+            Object.assign(el.style, val);
+          } else if (key === 'value' && (vnode.type === 'input' || vnode.type === 'textarea' || vnode.type === 'select')) {
+            el.value = val;
+          } else {
+            el.setAttribute(key, val);
+          }
+        }
+
+        // Render children
+        const children = props.children;
+        if (Array.isArray(children)) {
+          children.forEach(child => el.appendChild(renderDOM(child)));
+        } else if (children !== undefined && children !== null && children !== false) {
+          el.appendChild(renderDOM(children));
+        }
+
+        return el;
+      }
+
+      function scheduleRender() {
+        if (rootContainer && rootVirtualNode) {
+          const newDom = renderDOM(rootVirtualNode);
+          rootContainer.innerHTML = '';
+          rootContainer.appendChild(newDom);
+        }
+      }
+
+      window.React = {
+        createElement,
+        useState,
+        useEffect,
+        useRef,
+        useMemo,
+        useCallback
+      };
+
+      window.ReactDOM = {
+        createRoot: function(container) {
+          rootContainer = container;
+          return {
+            render: function(vnode) {
+              rootVirtualNode = vnode;
+              scheduleRender();
+            }
+          };
+        }
+      };
+    })();
+  </script>
+  </script>
+</head>
+<body>
+  <!-- App Mounting Root -->
+  <div id="root">
+    <div style="padding: 2rem; text-align: center; font-family: sans-serif; color: #2563eb;">
+      <h2>Loading LifeMate AI...</h2>
+      <p style="color: #64748b; font-size: 0.9rem;">Your Guide • Your Companion • Your Daily Support</p>
+    </div>
+  </div>
+
+  <!-- LifeMate AI Modular Architecture Scripts -->
+  <script src="js/icons.js"></script>
+  <script src="js/soundEngine.js"></script>
+  <script src="js/speechEngine.js"></script>
+  <script src="js/translations.js"></script>
+  <script src="js/store.js"></script>
+  
+  <script src="js/components/Navbar.js"></script>
+  <script src="js/components/Footer.js"></script>
+  <script src="js/components/VoiceAssistantModal.js"></script>
+
+  <script src="js/pages/HomePage.js"></script>
+  <script src="js/pages/LifeGuidePage.js"></script>
+  <script src="js/pages/LifeCompanionPage.js"></script>
+  <script src="js/pages/LifeReminderPage.js"></script>
+  <script src="js/pages/LifeLanguagePage.js"></script>
+  <script src="js/pages/LifeEmergencyPage.js"></script>
+  <script src="js/pages/AboutPage.js"></script>
+
+  <script src="js/app.js"></script>
+
+  <!-- Application Mount Script -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      try {
+        const rootElement = document.getElementById('root');
+        if (window.ReactDOM && window.ReactDOM.createRoot && window.App) {
+          const root = window.ReactDOM.createRoot(rootElement);
+          root.render(window.React.createElement(window.App));
+        } else {
+          console.error("Initialization error: React or App not ready");
+        }
+      } catch (e) {
+        console.error("Mount error:", e);
+      }
+    });
+  </script>
+</body>
+</html>
